@@ -1,0 +1,5 @@
+websockets
+azure-identity
+azure-digitaltwins-core
+numpy
+scikit-learn
