@@ -20,7 +20,7 @@ Requirements :
 
 - Arduino IDE
 - Python 3.8+
-- Libraries: websockets, sqlite3, flask
+- Libraries: websockets, sqlite3, Isolation Forest model
 - Any 3D-compatible browser (Chrome recommended)
 
 Steps to Run :
