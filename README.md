@@ -11,6 +11,8 @@ This project simulates a smart factory using a digital twin approach. It include
 
 - Conveyor Belt Sensors for real-time data acquisition.
 
+- AI model Predicition from sensor values
+
 - WebSocket Backend for real-time communication.
 
 - SQLite Database for storing and retrieving historical data.
