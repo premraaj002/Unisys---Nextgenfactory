@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conveyor Belt Monitoring Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@2.0.2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.0.2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4285F4;
+            --success-color: #34A853;
+            --warning-color: #FBBC05;
+            --danger-color: #EA4335;
+            --text-color: #333;
+            --light-gray: #f5f5f5;
+            --medium-gray: #e0e0e0;
+            --dark-gray: #757575;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        
+        .container {
+            padding: 15px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            padding: 20px;
+            transition: transform 0.3s ease;
+        }
+        
+        .panel:hover {
+            transform: translateY(-5px);
+        }
+        
+        .panel-header {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--medium-gray);
+            color: var(--primary-color);
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .status-circle {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        
+        .status-running { background-color: var(--success-color); }
+        .status-warning { background-color: var(--warning-color); }
+        .status-error { background-color: var(--danger-color); }
+        
+        .metric {
+            font-size: 24px;
+            font-weight: 500;
+            margin: 10px 0;
+        }
+        
+        .metric-label {
+            font-size: 14px;
+            color: var(--dark-gray);
+            margin-bottom: 5px;
+        }
+        
+        .alert {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            background-color: white;
+            border-left: 4px solid var(--warning-color);
+            display: flex;
+            align-items: center;
+        }
+        
+        .alert.warning {
+            border-left-color: var(--warning-color);
+            background-color: rgba(251, 188, 5, 0.1);
+        }
+        
+        .alert.error {
+            border-left-color: var(--danger-color);
+            background-color: rgba(234, 67, 53, 0.1);
+        }
+        
+        .alert.success {
+            border-left-color: var(--success-color);
+            background-color: rgba(52, 168, 83, 0.1);
+        }
+        
+        .alert-icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px; /* Increased height for better visibility */
+            width: 100%;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .button:hover {
+            background-color: #3367D6;
+        }
+        
+        .button.secondary {
+            background-color: white;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+        
+        .button.secondary:hover {
+            background-color: var(--light-gray);
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        
+        .prediction-indicator {
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .prediction-normal {
+            background-color: rgba(52, 168, 83, 0.1);
+            color: var(--success-color);
+        }
+        
+        .prediction-warning {
+            background-color: rgba(251, 188, 5, 0.1);
+            color: var(--warning-color);
+        }
+        
+        .prediction-danger {
+            background-color: rgba(234, 67, 53, 0.1);
+            color: var(--danger-color);
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            .panel-header {
+                font-size: 16px;
+            }
+            
+            .metric {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Factory Management System</h1>
+        
+        <div class="dashboard">
+            <!-- Status Panel -->
+            <div class="panel">
+                <div class="panel-header">Current Status</div>
+                <div class="status-indicator">
+                    <div class="status-circle" id="statusCircle"></div>
+                    <span id="statusText">Connecting...</span>
+                </div>
+                
+                <div class="metric-label">Travel Time</div>
+                <div class="metric" id="travelTime">--</div>
+                
+                <div class="metric-label">Vibration Level</div>
+                <div class="metric" id="vibrationLevel">--</div>
+                
+                <div class="metric-label">Maintenance Prediction</div>
+                <div class="prediction-indicator" id="predictionIndicator">
+                    Loading prediction...
+                </div>
+            </div>
+            
+            <!-- Alerts Panel -->
+            <div class="panel">
+                <div class="panel-header">Alerts</div>
+                <div id="alertsContainer">
+                    <div class="alert" id="connectionAlert">
+                        <span class="alert-icon">⏳</span>
+                        Connecting to WebSocket server...
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Controls Panel -->
+            <div class="panel">
+                <div class="panel-header">Controls</div>
+                <div class="controls">
+                    <button class="button" id="refreshBtn">Refresh Status</button>
+                    <button class="button secondary" id="loadHistoryBtn">Load History</button>
+                    <button class="button secondary" id="downloadJsonBtn">Download JSON</button>
+                    <button class="button secondary" id="downloadExcelBtn">Download Excel</button>
+                </div>
+                
+                <div>
+                    <label for="historyHours" class="metric-label">History Hours:</label>
+                    <select id="historyHours" class="button secondary">
+                        <option value="1">1 hour</option>
+                        <option value="6">6 hours</option>
+                        <option value="24" selected>24 hours</option>
+                        <option value="72">72 hours</option>
+                    </select>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <div class="metric-label">Last Updated</div>
+                    <div id="lastUpdated">Never</div>
+                </div>
+            </div>
+            
+            <!-- Travel Time Chart -->
+            <div class="panel full-width">
+<!-- Add this section inside the panel for Travel Time History -->
+<div class="panel-header">Travel Time History</div>
+<div class="controls">
+    <button class="button" id="last1HourBtn">Last 1 Hour</button> <!-- New button for last 1 hour -->
+    <button class="button" id="last5HoursBtn">Last 5 Hours</button>
+    <button class="button" id="last24HoursBtn">Last 24 Hours</button>
+    <button class="button" id="lastWeekBtn">Last Week</button>
+    <button class="button" id="lastMonthBtn">Last Month</button>
+    <button class="button" id="lastYearBtn">Last Year</button>
+</div>
+<div class="chart-container">
+    <canvas id="travelTimeChart"></canvas>
+</div>
+<div id="latestTravelTime" class="metric">Latest Travel Time: -- seconds</div>
+            
+            <!-- Vibration Chart -->
+            <div class="panel full-width">
+                <div class="panel-header">Vibration History</div>
+                <div class="chart-container">
+                    <canvas id="vibrationChart"></canvas>
+                </div>
+                <div id="latestVibrationLevel" class="metric">Latest Vibration Level: --</div>
+            </div>
+            
+            <!-- Predictive Analysis -->
+            <div class="panel full-width">
+                <div class="panel-header">Predictive Maintenance Analysis</div>
+                <div class="chart-container">
+                    <canvas id="predictiveChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        const wsUrl = `ws://localhost:8765`;
+        let websocket;
+        let travelTimeChart, vibrationChart, predictiveChart;
+        
+       
+        let travelTimeData = [];
+        let vibrationData = [];
+        const maxDataPoints = 50;
+        let lastFailurePrediction = false;
+        let refreshInterval;
+
+        // Initialize WebSocket connection
+        function connectWebSocket() {
+            updateAlert('⏳ Connecting to WebSocket server...', 'status');
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function() {
+                updateAlert('✅ Connected to conveyor belt monitoring system', 'success');
+                updateStatus('Connected');
+                
+                // Request initial status
+                websocket.send(JSON.stringify({action: "get_status"}));
+                loadHistoricalData();
+                
+                // Start periodic refresh
+                refreshInterval = setInterval(function() {
+                    if (websocket.readyState === WebSocket.OPEN) {
+                        websocket.send(JSON.stringify({action: "get_status"}));
+                    }
+                }, 5000);
+            };
+            
+            websocket.onclose = function() {
+                updateAlert('⚠️ Disconnected from server. Attempting to reconnect...', 'error');
+                updateStatus('Disconnected');
+                clearInterval(refreshInterval);
+                setTimeout(connectWebSocket, 5000);
+            };
+            
+            websocket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateLastUpdated();
+                    
+                    if (data.status !== undefined) {
+                        updateStatus(data.status);
+                    }
+                    
+                    if (data.travelTime !== undefined) {
+                        updateTravelTime(data.travelTime);
+                    }
+                    
+                    if (data.vibrationWarning !== undefined) {
+                        updateVibrationWarning(data.vibrationWarning);
+                    }
+                    
+                    if (data.failure_predicted !== undefined) {
+                        updateFailurePrediction(data.failure_predicted);
+                    }
+                    
+                    if (data.action === "history_data") {
+                        processHistoricalData(data.data);
+                    }
+                } catch (error) {
+                    console.error('Error processing message:', error);
+                    updateAlert('❌ Error processing server message', 'error');
+                }
+            };
+            
+            websocket.onerror = function(error) {
+                console.error('WebSocket Error:', error);
+                updateAlert('❌ WebSocket error occurred', 'error');
+            };
+        }
+
+        // Update alert system
+        function updateAlert(message, type = 'status') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert ${type}`;
+            
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'alert-icon';
+            
+            if (message.startsWith('✅')) iconSpan.textContent = '✅';
+            else if (message.startsWith('⚠️')) iconSpan.textContent = '⚠️';
+            else if (message.startsWith('❌')) iconSpan.textContent = '❌';
+            else if (message.startsWith('⏳')) iconSpan.textContent = '⏳';
+            else iconSpan.textContent = 'ℹ️';
+            
+            const textSpan = document.createElement('span');
+            textSpan.textContent = message.replace(/^[^\w\s]+/, '');
+            
+            alertDiv.appendChild(iconSpan);
+            alertDiv.appendChild(textSpan);
+            
+            const alertsContainer = document.getElementById('alertsContainer');
+            alertsContainer.insertBefore(alertDiv, alertsContainer.firstChild);
+            
+            while (alertsContainer.children.length > 5) {
+                alertsContainer.removeChild(alertsContainer.lastChild);
+            }
+        }
+
+        // Update status display
+        function updateStatus(status) {
+            const statusText = document.getElementById('statusText');
+            const statusCircle = document.getElementById('statusCircle');
+            
+            statusText.textContent = status;
+            
+            if (status.toLowerCase().includes('running')) {
+                statusCircle.className = 'status-circle status-running';
+            } else if (status.toLowerCase().includes('warning') || status.toLowerCase().includes('check')) {
+                statusCircle.className = 'status-circle status-warning';
+            } else {
+                statusCircle.className = 'status-circle status-error';
+            }
+        }
+
+        // Update travel time display
+        function updateTravelTime(time) {
+            document.getElementById('travelTime').textContent = `${time} seconds`;
+            document.getElementById('latestTravelTime').textContent = `Latest Travel Time: ${time} seconds`;
+            
+            travelTimeData.push({
+                x: new Date().toISOString(),
+                y: time
+            });
+            
+            if (travelTimeData.length > maxDataPoints) {
+                travelTimeData.shift();
+            }
+            
+            updateTravelTimeChart();
+            
+            // Check for threshold and update prediction
+            if (time > 15) {
+                updateAlert(`⚠️ Warning: High travel time detected (${time} seconds)`, 'warning');
+            }
+            
+            
+            const vibrationWarning = document.getElementById('vibrationLevel').textContent.includes('HIGH');
+            const failurePredicted = predictFailure(time, vibrationWarning);
+            updateFailurePrediction(failurePredicted);
+        }
+
+        // Update vibration warning display
+        function updateVibrationWarning(warning) {
+            const vibrationLevel = document.getElementById('vibrationLevel');
+            
+            if (warning) {
+                vibrationLevel.textContent = 'HIGH';
+                vibrationLevel.style.color = 'var(--danger-color)';
+                updateAlert('⚠️ Warning: High vibration detected - Check belt tension', 'warning');
+            } else {
+                vibrationLevel.textContent = 'Normal';
+                vibrationLevel.style.color = 'var(--success-color)';
+            }
+            
+            vibrationData.push({
+                x: new Date().toISOString(),
+                y: warning ? 1 : 0
+            });
+            
+            if (vibrationData.length > maxDataPoints) {
+                vibrationData.shift();
+            }
+            
+            updateVibrationChart();
+            document.getElementById('latestVibrationLevel').textContent = `Latest Vibration Level: ${warning ? 'HIGH' : 'Normal'}`;
+           
+            const travelTime = parseFloat(document.getElementById('travelTime').textContent);
+            const failurePredicted = predictFailure(travelTime, warning);
+            updateFailurePrediction(failurePredicted);
+        }
+
+        // Predict failure function
+        function predictFailure(travelTime, vibrationWarning) {
+            return travelTime > 15 || vibrationWarning;
+        }
+
+        // Update failure prediction
+        function updateFailurePrediction(predicted) {
+            lastFailurePrediction = predicted;
+            const indicator = document.getElementById('predictionIndicator');
+            
+            if (predicted) {
+                indicator.textContent = 'Maintenance Recommended Soon';
+                indicator.className = 'prediction-indicator prediction-danger';
+                updateAlert('❌ Predictive maintenance alert: Potential failure detected', 'error');
+            } else {
+                indicator.textContent = 'Normal Operation Expected';
+                indicator.className = 'prediction-indicator prediction-normal';
+            }
+            
+            updatePredictiveChart();
+        }
+
+        // Update last updated timestamp
+        function updateLastUpdated() {
+            const now = new Date();
+            document.getElementById('lastUpdated').textContent = now.toLocaleString();
+        }
+
+        // Load historical data
+
+function loadHistoricalData(hours) {
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify({
+            action: "get_history",
+            hours: hours
+        }));
+    }
+}
+
+// Event listeners for the buttons
+document.getElementById('last1HourBtn').addEventListener('click', function() {
+    loadHistoricalData(1); 
+});
+
+document.getElementById('last5HoursBtn').addEventListener('click', function() {
+    loadHistoricalData(5); 
+});
+
+document.getElementById('last24HoursBtn').addEventListener('click', function() {
+    loadHistoricalData(24); 
+});
+
+document.getElementById('lastWeekBtn').addEventListener('click', function() {
+    loadHistoricalData(168);
+});
+
+document.getElementById('lastMonthBtn').addEventListener('click', function() {
+    loadHistoricalData(720); 
+});
+
+document.getElementById('lastYearBtn').addEventListener('click', function() {
+    loadHistoricalData(8760); 
+});
+
+
+function processHistoricalData(data) {
+    if (!Array.isArray(data)) return;
+
+    travelTimeData = [];
+    vibrationData = [];
+
+    data.forEach(row => {
+        if (row && row.length >= 4) {
+            const [timestamp, travelTime, vibrationWarning] = row;
+
+            if (timestamp && travelTime !== undefined) {
+                travelTimeData.push({
+                    x: new Date(timestamp).getTime(), 
+                    y: travelTime
+                });
+            }
+
+            if (timestamp && vibrationWarning !== undefined) {
+                vibrationData.push({
+                    x: new Date(timestamp).getTime(), 
+                    y: vibrationWarning ? 1 : 0
+                });
+            }
+        }
+    });
+
+    updateTravelTimeChart();
+    updateVibrationChart();
+    updatePredictiveChart();
+}
+
+        // Process historical data from server
+        function processHistoricalData(data) {
+            if (!Array.isArray(data)) return;
+        
+            travelTimeData = [];
+            vibrationData = [];
+        
+            data.forEach(row => {
+                if (row && row.length >= 4) {
+                    const [timestamp, travelTime, vibrationWarning] = row;
+        
+                    if (timestamp && travelTime !== undefined) {
+                        travelTimeData.push({
+                            x: new Date(timestamp).getTime(), // Ensure timestamp is in milliseconds
+                            y: travelTime
+                        });
+                    }
+        
+                    if (timestamp && vibrationWarning !== undefined) {
+                        vibrationData.push({
+                            x: new Date(timestamp).getTime(), // Ensure timestamp is in milliseconds
+                            y: vibrationWarning ? 1 : 0
+                        });
+                    }
+                }
+            });
+        
+            updateTravelTimeChart();
+            updateVibrationChart();
+            updatePredictiveChart();
+        }
+
+        // Download JSON
+        function downloadJson() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(travelTimeData));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "travel_time_data.json");
+            document.body.appendChild(downloadAnchorNode); // required for firefox
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        // Download Excel
+        function downloadExcel() {
+            const worksheet = XLSX.utils.json_to_sheet(travelTimeData.map(item => ({
+                Timestamp: item.x,
+                TravelTime: item.y
+            })));
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Travel Time Data");
+            XLSX.writeFile(workbook, "travel_time_data.xlsx");
+        }
+
+
+        function initCharts() {
+            const travelTimeCtx = document.getElementById('travelTimeChart').getContext('2d');
+            travelTimeChart = new Chart(travelTimeCtx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Travel Time (seconds)',
+                        data: travelTimeData,
+                        borderColor: 'var(--primary-color)',
+                        backgroundColor: 'rgba(66, 133, 244, 0.3)',
+                        tension: 0.3,
+                        fill: true,
+                        borderWidth: 2,
+                        pointRadius: 5, 
+                        pointBackgroundColor: 'white',
+                        pointBorderColor: 'var(--primary-color)',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'MMM d, yyyy HH:mm',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'MMM D, HH:mm'
+                                }
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.1)',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time',
+                                color: 'var(--dark-gray)',
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Seconds',
+                                color: 'var(--dark-gray)',
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.1)',
+                            },
+                            ticks: {
+                                stepSize: 5, 
+                                callback: function(value) {
+                                    return value + 's';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    return `Travel Time: ${tooltipItem.raw.y} seconds`;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+
+            const vibrationCtx = document.getElementById('vibrationChart').getContext('2d');
+            vibrationChart = new Chart(vibrationCtx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Vibration Warning',
+                        data: vibrationData,
+                        borderColor: 'var(--danger-color)',
+                        backgroundColor: 'rgba(234, 67, 53, 0.3)',
+                        tension: 0.3,
+                        fill: true,
+                        borderWidth: 2,
+                        pointRadius: 5,
+                        pointBackgroundColor: 'white',
+                        pointBorderColor: 'var(--danger-color)',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'MMM d, yyyy HH:mm',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'MMM D, HH:mm'
+                                }
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.1)',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time',
+                                color: 'var(--dark-gray)',
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            title: {
+                                display: true,
+                                text: 'Vibration Level',
+                                color: 'var(--dark-gray)',
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.1)',
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value === 1 ? 'High' : 'Normal';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y === 1 ? 'Vibration: High' : 'Vibration: Normal';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const predictiveCtx = document.getElementById('predictiveChart').getContext('2d');
+            predictiveChart = new Chart(predictiveCtx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Travel Time',
+                            data: travelTimeData,
+                            borderColor: 'var(--primary-color)',
+                            backgroundColor: 'rgba(66, 133, 244, 0.3)',
+                            tension: 0.3,
+                            yAxisID: 'y',
+                            borderWidth: 2,
+                            pointRadius: 5,
+                            pointBackgroundColor: 'white',
+                            pointBorderColor: 'var(--primary-color)',
+                        },
+                        {
+                            label: 'Vibration Warnings',
+                            data: vibrationData,
+                            borderColor: 'var(--danger-color)',
+                            backgroundColor: 'rgba(234, 67, 53, 0.3)',
+                            tension: 0.3,
+                            yAxisID: 'y1',
+                            borderWidth: 2,
+                            pointRadius: 5,
+                            pointBackgroundColor: 'white',
+                            pointBorderColor: 'var(--danger-color)',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'MMM d, yyyy HH:mm',
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'MMM D, HH:mm'
+                                }
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.1)',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time',
+                                color: 'var(--dark-gray)',
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Travel Time (seconds)',
+                                color: 'var(--primary-color)'
+                            },
+                            ticks: {
+                                stepSize: 5,
+                                callback: function(value) {
+                                    return value + 's';
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            max: 1,
+                            min: 0,
+                            ticks: {
+                                callback: function(value) {
+                                    return value === 1 ? 'High' : 'Normal';
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Vibration Level',
+                                color: 'var(--danger-color)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    if (tooltipItem.datasetIndex === 0) {
+                                        return `Travel Time: ${tooltipItem.raw.y} seconds`;
+                                    } else {
+                                        return `Vibration: ${tooltipItem.raw.y === 1 ? 'High' : 'Normal'}`;
+                                    }
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                warningThreshold: {
+                                    type: 'line',
+                                    yMin: 15,
+                                    yMax: 15,
+                                    borderColor: 'var(--warning-color)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {
+                                        content: 'Warning Threshold',
+                                        enabled: true,
+                                        position: 'end'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update charts with new data
+        function updateTravelTimeChart() {
+            try {
+                if (travelTimeData.length > 0) {
+                    travelTimeChart.data.datasets[0].data = travelTimeData;
+                    travelTimeChart.update();
+                }
+            } catch (error) {
+                console.error('Error updating travel time chart:', error);
+            }
+        }
+
+        function updateVibrationChart() {
+            try {
+                if (vibrationData.length > 0) {
+                    vibrationChart.data.datasets[0].data = vibrationData;
+                    vibrationChart.update();
+                }
+            } catch (error) {
+                console.error('Error updating vibration chart:', error);
+            }
+        }
+
+        function updatePredictiveChart() {
+            try {
+                predictiveChart.data.datasets[0].data = travelTimeData;
+                predictiveChart.data.datasets[1].data = vibrationData;
+                const annotations = predictiveChart.options.plugins.annotation.annotations;
+                if (lastFailurePrediction && travelTimeData.length > 0) {
+                    const lastPoint = travelTimeData[travelTimeData.length - 1];
+                    annotations.prediction = {
+                        type: 'point',
+                        xValue: lastPoint.x,
+                        yValue: lastPoint.y,
+                        radius: 8,
+                        backgroundColor: 'var(--danger-color)',
+                        borderColor: 'white',
+                        borderWidth: 2,
+                        label: {
+                            content: 'Predicted Failure',
+                            enabled: true,
+                            position: 'top'
+                        }
+                    };
+                } else {
+                    delete annotations.prediction;
+                }
+                predictiveChart.update();
+            } catch (error) {
+                console.error('Error updating predictive chart:', error);
+            }
+        }
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            connectWebSocket();
+            
+            // Button event listeners
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(JSON.stringify({action: "get_status"}));
+                    updateAlert('ℹ️ Manual refresh requested');
+                }
+            });
+            
+            document.getElementById('loadHistoryBtn').addEventListener('click', loadHistoricalData);
+            document.getElementById('historyHours').addEventListener('change', loadHistoricalData);
+            document.getElementById('downloadJsonBtn').addEventListener('click', downloadJson);
+            document.getElementById('downloadExcelBtn').addEventListener('click', downloadExcel);
+        });
+    </script>
+</body>
+</html>
