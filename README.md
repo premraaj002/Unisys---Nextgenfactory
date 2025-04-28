@@ -15,7 +15,7 @@ This project simulates a smart factory using a digital twin approach. It include
 
 - SQLite Database for storing and retrieving historical data.
 
-# Getting Started : 
+# Getting Started 
 Requirements :
 
 - Arduino IDE
